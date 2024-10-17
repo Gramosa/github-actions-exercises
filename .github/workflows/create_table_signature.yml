@@ -33,7 +33,7 @@ jobs:
       - name: Get column types for all mvw views from PostgreSQL
         run: |
           echo "Conectando ao PostgreSQL para obter colunas de todas as views que começam com 'mvw_'..."
-          PGPASSWORD=${{ secrets.POSTGRESS_PASSWORD }} psql -h localhost -p 5432 -U ${{ secrets.POSTGRESS_USER }} -d test_database -c "\
+          PGPASSWORD=${{ secrets.POSTGRESS_PASSWORD }} psql -h localhost -p 5432 -U ${{ secrets.POSTGRESS_USER }} -d dvdrental -c "\
           COPY (SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_name LIKE 'mvw_%' ORDER BY table_name, ordinal_position) TO STDOUT" > all_views_columns.txt
   
       - name: Generate table clauses
