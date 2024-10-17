@@ -1,0 +1,70 @@
+# This is a basic workflow that is manually triggered
+
+name: CREATE TABLE SIGNATURE
+
+# Controls when the action will run. Workflow runs when manually triggered using the UI
+# or API.
+on:
+  workflow_dispatch:
+    # # Inputs the workflow accepts.
+    # inputs:
+    #   name:
+    #     # Friendly description to be shown in the UI instead of 'name'
+    #     description: 'Person to greet'
+    #     # Default value if no value is explicitly provided
+    #     default: 'World'
+    #     # Input has to be provided for the workflow to run
+    #     required: true
+    #     # The data type of the input
+    #     type: string
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "greet"
+  create_table_signature:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Get column types for all mvw views from PostgreSQL
+        run: |
+          echo "Conectando ao PostgreSQL para obter colunas de todas as views que começam com 'mvw_'..."
+          PGPASSWORD=${{ secrets.POSTGRESS_PASSWORD }} psql -h localhost -p 5432 -U ${{ secrets.POSTGRESS_USER }} -d test_database -c "\
+          COPY (SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_name LIKE 'mvw_%' ORDER BY table_name, ordinal_position) TO STDOUT" > all_views_columns.txt
+  
+      - name: Generate table clauses
+        run: |
+          echo "Gerando cláusulas TABLE..."
+          current_table=""
+          
+          while read line; do
+            table=$(echo $line | awk '{print $1}')
+            column=$(echo $line | awk '{print $2}')
+            datatype=$(echo $line | awk '{print $3}')
+            
+            if [[ "$table" != "$current_table" ]]; then
+              if [[ "$current_table" != "" ]]; then
+                echo "}" >> tables.txt
+                echo "" >> tables.txt
+              fi
+              echo "Table $table {" >> tables.txt
+              current_table=$table
+            fi
+            
+            echo "    $column $datatype;" >> tables.txt
+            
+          done < all_views_columns.txt
+  
+          if [[ "$current_table" != "" ]]; then
+            echo "}" >> tables.txt
+          fi
+
+      - name: Upload tables.txt as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: table-clauses
+          path: tables.txt
